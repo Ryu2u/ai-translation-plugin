@@ -51,40 +51,21 @@ function openInputPanel() {
 }
 
 // 选中文字翻译：立即显示 Sidebar loading，翻译完成后填充
-async function handleSelectionTranslate(text: string) {
+async function handleSelectionTranslate(text: string, targetLang = 'zh') {
   console.log('[AI-Translate content] handleSelectionTranslate, length:', text.length)
   const state = reactive({
     originalText: text,
     translatedText: '',
+    targetLang,
     loading: true,
     error: ''
   })
   showSidebarReactive(state)
 
-  try {
-    console.log('[AI-Translate content] sendMessage TRANSLATE (selection)')
-    const response = await chrome.runtime.sendMessage({
-      type: 'TRANSLATE',
-      payload: { text, targetLang: 'zh' }
-    }) as { translatedText?: string; error?: string }
-    console.log('[AI-Translate content] selection response:', response)
-
-    if (!response) {
-      state.error = '无响应，请检查 Service Worker'
-    } else if (response.error) {
-      state.error = response.error
-    } else {
-      state.translatedText = response.translatedText || ''
-    }
-  } catch (err: any) {
-    console.error('[AI-Translate content] selection sendMessage threw:', err)
-    state.error = err?.message || String(err)
-  } finally {
-    state.loading = false
-  }
+  doTranslate(state, state.targetLang)
 }
 
-function showSidebarReactive(state: { originalText: string; translatedText: string; loading: boolean; error: string }) {
+function showSidebarReactive(state: { originalText: string; translatedText: string; targetLang: string; loading: boolean; error: string }) {
   if (sidebarInstance) {
     sidebarInstance.unmount()
     sidebarInstance = null
@@ -100,8 +81,16 @@ function showSidebarReactive(state: { originalText: string; translatedText: stri
       return h(Sidebar as any, {
         originalText: state.originalText,
         translatedText: state.translatedText,
+        targetLang: state.targetLang,
         loading: state.loading,
         error: state.error,
+        'onUpdate:targetLang': (lang: string) => {
+          state.targetLang = lang
+          // Re-translate with new language
+          doTranslate(state, lang)
+          // Save language preference
+          chrome.storage?.local?.set({ target_lang: lang })
+        },
         onClose: () => {
           app.unmount()
           sidebarInstance = null
@@ -112,6 +101,31 @@ function showSidebarReactive(state: { originalText: string; translatedText: stri
   })
   sidebarInstance = app
   app.mount(container)
+}
+
+async function doTranslate(state: { originalText: string; translatedText: string; targetLang: string; loading: boolean; error: string }, targetLang: string) {
+  state.loading = true
+  state.error = ''
+  state.translatedText = ''
+
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: 'TRANSLATE',
+      payload: { text: state.originalText, targetLang }
+    }) as { translatedText?: string; error?: string }
+
+    if (!response) {
+      state.error = '无响应，请检查 Service Worker'
+    } else if (response.error) {
+      state.error = response.error
+    } else {
+      state.translatedText = response.translatedText || ''
+    }
+  } catch (err: any) {
+    state.error = err?.message || String(err)
+  } finally {
+    state.loading = false
+  }
 }
 
 interface ContentMessage {

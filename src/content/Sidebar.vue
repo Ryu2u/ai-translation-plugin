@@ -3,6 +3,9 @@
     <div class="sidebar">
       <div class="sidebar-header">
         <span>翻译结果</span>
+        <select v-model="currentLang" :disabled="loading" class="lang-select">
+          <option v-for="opt in langOptions" :key="opt.code" :value="opt.code">{{ opt.label }}</option>
+        </select>
         <button class="close-btn" @click="handleClose">×</button>
       </div>
       <div class="sidebar-content">
@@ -28,18 +31,39 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 
 const props = defineProps<{
   originalText: string
   translatedText: string
+  targetLang?: string
   loading?: boolean
   error?: string
 }>()
 
 const emit = defineEmits<{
   (e: 'close'): void
+  (e: 'update:targetLang', lang: string): void
 }>()
+
+const langOptions = [
+  { code: 'zh', label: '中文' },
+  { code: 'en', label: 'English' },
+  { code: 'ja', label: '日本語' },
+  { code: 'ko', label: '한국어' },
+  { code: 'fr', label: 'Français' },
+  { code: 'de', label: 'Deutsch' },
+  { code: 'es', label: 'Español' },
+  { code: 'ru', label: 'Русский' },
+  { code: 'ar', label: 'العربية' },
+  { code: 'pt', label: 'Português' }
+]
+
+const currentLang = ref(props.targetLang || 'zh')
+
+watch(currentLang, (newLang) => {
+  emit('update:targetLang', newLang)
+})
 
 const copied = ref(false)
 
@@ -104,6 +128,23 @@ async function copyText() {
 
 .close-btn:hover {
   color: #e5e7eb;
+}
+
+.lang-select {
+  background: #2d2d2d;
+  color: #e5e7eb;
+  border: 1px solid #3d3d3d;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 13px;
+  cursor: pointer;
+  margin-left: auto;
+  margin-right: 12px;
+}
+
+.lang-select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .sidebar-content {
