@@ -182,7 +182,7 @@ async function copyResult() {
 onMounted(() => {
   // 从 storage 加载上次选择的目标语言
   chrome.storage?.local?.get('target_lang', (r) => {
-    if (r?.target_lang) targetLang.value = r.target_lang
+    if (typeof r?.target_lang === 'string') targetLang.value = r.target_lang
   })
 })
 
