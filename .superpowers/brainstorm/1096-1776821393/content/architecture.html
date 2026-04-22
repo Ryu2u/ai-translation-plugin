@@ -1,0 +1,106 @@
+<h2>AI 翻译插件 - 整体架构</h2>
+<p class="subtitle">基于 Vite + Vue + Chrome Extensions 构建</p>
+
+<div class="section">
+  <h3>技术栈</h3>
+  <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px;">
+    <span class="label" style="background: #4ade80; padding: 4px 12px; border-radius: 4px;">Vite</span>
+    <span class="label" style="background: #42b883; padding: 4px 12px; border-radius: 4px; color: white;">Vue 3</span>
+    <span class="label" style="background: #ff6900; padding: 4px 12px; border-radius: 4px; color: white;">Chrome Extensions</span>
+    <span class="label" style="background: #6366f1; padding: 4px 12px; border-radius: 4px; color: white;">TypeScript</span>
+  </div>
+</div>
+
+<div class="section">
+  <h3>核心功能入口</h3>
+  <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-top: 10px;">
+    <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; text-align: center;">
+      <div style="font-size: 24px; margin-bottom: 5px;">🖱️</div>
+      <strong>右键菜单</strong>
+      <p style="font-size: 12px; color: #666;">页面任意位置右键<br/>选择翻译功能</p>
+    </div>
+    <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; text-align: center;">
+      <div style="font-size: 24px; margin-bottom: 5px;">📌</div>
+      <strong>悬浮按钮</strong>
+      <p style="font-size: 12px; color: #666;">右下角固定按钮<br/>点击翻译整页</p>
+    </div>
+    <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; text-align: center;">
+      <div style="font-size: 24px; margin-bottom: 5px;">💬</div>
+      <strong>选中文字气泡</strong>
+      <p style="font-size: 12px; color: #666;">选中文字后<br/>出现翻译按钮</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>系统架构</h3>
+  <div style="background: #1f2937; color: #e5e7eb; padding: 20px; border-radius: 8px; font-family: monospace; font-size: 13px; margin-top: 10px;">
+    <div style="margin-bottom: 15px;">
+      <span style="color: #60a5fa;">┌─────────────────────┐</span>
+      <span style="color: #60a5fa;">│   Content Scripts   │</span>
+      <span style="color: #60a5fa;">│  (悬浮按钮/气泡)    │</span>
+      <span style="color: #60a5fa;">└─────────┬───────────┘</span>
+    </div>
+    <div style="margin-left: 20px; margin-bottom: 15px; color: #9ca3af;">│ 监听用户交互</div>
+    <div style="margin-left: 20px; margin-bottom: 15px; color: #9ca3af;">▼</div>
+    <div style="margin-bottom: 15px;">
+      <span style="color: #60a5fa;">┌─────────────────────┐</span>
+      <span style="color: #f472b6;">│   Background Worker │</span>
+      <span style="color: #60a5fa;">│  (消息转发/处理)    │</span>
+      <span style="color: #60a5fa;">└─────────┬───────────┘</span>
+    </div>
+    <div style="margin-left: 20px; margin-bottom: 15px; color: #9ca3af;">│ API 调用</div>
+    <div style="margin-left: 20px; margin-bottom: 15px; color: #9ca3af;">▼</div>
+    <div style="margin-bottom: 15px;">
+      <span style="color: #60a5fa;">┌─────────────────────┐</span>
+      <span style="color: #34d399;">│   OpenAI API        │</span>
+      <span style="color: #60a5fa;">│  (翻译引擎)        │</span>
+      <span style="color: #60a5fa;">└─────────────────────┘</span>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>UI 展示方式</h3>
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 10px;">
+    <div style="background: #fef3c7; padding: 15px; border-radius: 8px; border-left: 4px solid #f59e0b;">
+      <strong>原文下方插入</strong>
+      <p style="font-size: 12px; color: #666; margin-top: 5px;">翻译结果直接插入到<br/>原文下方，高亮显示</p>
+    </div>
+    <div style="background: #dbeafe; padding: 15px; border-radius: 8px; border-left: 4px solid #3b82f6;">
+      <strong>侧边栏展示</strong>
+      <p style="font-size: 12px; color: #666; margin-top: 5px;">右侧滑出翻译面板<br/>可拖拽调整位置</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>设置页面 (Options Page)</h3>
+  <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; margin-top: 10px;">
+    <ul style="margin: 0; padding-left: 20px; color: #374151;">
+      <li>API Key 管理（添加/删除/切换）</li>
+      <li>默认目标语言设置</li>
+      <li>UI 风格选择（深色主题）</li>
+      <li>快捷键配置</li>
+    </ul>
+  </div>
+</div>
+
+<div class="pros-cons" style="margin-top: 20px;">
+  <div class="pros">
+    <h4>优势</h4>
+    <ul>
+      <li>Vite 快速构建，HMR 开发体验好</li>
+      <li>Vue 3 响应式 UI，开发效率高</li>
+      <li>深色主题，护眼舒适</li>
+      <li>多 API Key 切换，灵活方便</li>
+    </ul>
+  </div>
+  <div class="cons">
+    <h4>注意</h4>
+    <ul>
+      <li>需要用户自备 API Key</li>
+      <li>仅支持 Chromium 内核浏览器</li>
+    </ul>
+  </div>
+</div>
