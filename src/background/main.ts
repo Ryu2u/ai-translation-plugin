@@ -5,17 +5,25 @@ import { getActiveApiConfig, setTargetLang } from './storage'
 // 消息处理
 chrome.runtime.onMessage.addListener(
   (message: MessageType, _sender, sendResponse) => {
+    console.log('[AI-Translate bg] onMessage received:', message?.type, message)
     handleMessage(message)
-      .then(sendResponse)
-      .catch(err => sendResponse({ error: err.message }))
+      .then(result => {
+        console.log('[AI-Translate bg] handleMessage resolved:', result)
+        sendResponse(result)
+      })
+      .catch(err => {
+        console.error('[AI-Translate bg] handleMessage rejected:', err)
+        sendResponse({ error: err.message })
+      })
     return true // 异步响应
   }
 )
 
 async function handleMessage(message: MessageType): Promise<any> {
+  console.log('[AI-Translate bg] handleMessage dispatching type:', message.type)
   switch (message.type) {
     case 'TRANSLATE':
-      return await translateText(message.payload.text, message.payload.sourceLang)
+      return await translateText(message.payload.text, message.payload.sourceLang, message.payload.targetLang)
 
     case 'GET_CONFIG':
       return await getActiveApiConfig()

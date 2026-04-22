@@ -2,7 +2,7 @@
   <button
     class="floating-btn"
     @click="handleClick"
-    title="翻译页面"
+    title="打开翻译输入框"
   >
     译
   </button>
@@ -10,12 +10,12 @@
 
 <script setup lang="ts">
 const emit = defineEmits<{
-  (e: 'translate', text: string): void
+  (e: 'translate'): void
 }>()
 
 function handleClick() {
-  const text = document.body.innerText
-  emit('translate', text)
+  console.log('[AI-Translate content] FloatingButton clicked')
+  emit('translate')
 }
 </script>
 

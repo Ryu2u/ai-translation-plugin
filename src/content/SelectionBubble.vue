@@ -4,7 +4,7 @@
       v-if="visible"
       class="selection-bubble"
       :style="{ left: x + 'px', top: y + 'px' }"
-      @click="handleClick"
+      @mousedown.prevent.stop="handleClick"
     >
       译
     </div>
@@ -43,6 +43,7 @@ function handleSelectionChange() {
 }
 
 function handleClick() {
+  console.log('[AI-Translate content] SelectionBubble clicked, text length:', selectionText.length)
   if (selectionText) {
     emit('translate', selectionText)
     visible.value = false

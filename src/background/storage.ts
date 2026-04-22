@@ -31,9 +31,11 @@ export async function getActiveApiConfig(): Promise<ApiConfig | null> {
   try {
     const result = await chrome.storage.local.get(STORAGE_KEYS.ACTIVE_API_ID)
     const activeId = result[STORAGE_KEYS.ACTIVE_API_ID]
+    console.log('[AI-Translate storage] ACTIVE_API_ID:', activeId)
     if (!activeId) return null
 
     const configs = await getApiConfigs()
+    console.log('[AI-Translate storage] configs count:', configs.length, 'ids:', configs.map(c => c.id))
     return configs.find(c => c.id === activeId) || null
   } catch (error) {
     console.error('Failed to get active API config:', error)

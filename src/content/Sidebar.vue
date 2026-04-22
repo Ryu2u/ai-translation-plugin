@@ -10,11 +10,18 @@
           <div class="section-label">原文</div>
           <div class="text-box original">{{ originalText }}</div>
         </div>
-        <div class="section">
-          <div class="section-label">译文</div>
-          <div class="text-box translated">{{ translatedText }}</div>
+        <div v-if="loading" class="loading-box">
+          <span class="spinner" />
+          <span>翻译中...</span>
         </div>
-        <button class="copy-btn" @click="copyText">复制译文</button>
+        <div v-else-if="error" class="error-box">{{ error }}</div>
+        <template v-else>
+          <div class="section">
+            <div class="section-label">译文</div>
+            <div class="text-box translated">{{ translatedText }}</div>
+          </div>
+          <button class="copy-btn" @click="copyText">{{ copied ? '已复制' : '复制译文' }}</button>
+        </template>
       </div>
     </div>
   </div>
@@ -26,6 +33,8 @@ import { ref } from 'vue'
 const props = defineProps<{
   originalText: string
   translatedText: string
+  loading?: boolean
+  error?: string
 }>()
 
 const emit = defineEmits<{
@@ -149,6 +158,34 @@ async function copyText() {
 .copy-btn:hover {
   background: #4338ca;
 }
+
+.loading-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 20px;
+  background: #2d2d2d;
+  border-radius: 6px;
+  color: #9ca3af;
+  font-size: 14px;
+}
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255,255,255,0.25);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+.error-box {
+  padding: 12px;
+  background: #4b1e1e;
+  color: #fca5a5;
+  border-radius: 6px;
+  font-size: 13px;
+  white-space: pre-wrap;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
 
 @keyframes fadeIn {
   from { opacity: 0; }
