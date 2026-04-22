@@ -59,10 +59,10 @@ const showForm = ref(false)
 const editingId = ref<string | null>(null)
 
 const formData = ref({
-  name: '',
+  name: 'api1',
   apiKey: '',
-  baseUrl: 'https://api.openai.com/v1',
-  model: 'gpt-3.5-turbo'
+  baseUrl: 'https://api.minimaxi.com/v1',
+  model: 'MiniMax-M2.7-highspeed'
 })
 
 onMounted(async () => {
