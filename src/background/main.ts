@@ -1,6 +1,6 @@
 import type { MessageType } from '../types'
 import { translateText } from './api'
-import { getActiveApiConfig, setTargetLang } from './storage'
+import { getActiveApiConfig, setTargetLang, getAutoTranslate, setAutoTranslate, getAutoTranslatePair, setAutoTranslatePair } from './storage'
 
 // 消息处理
 chrome.runtime.onMessage.addListener(
@@ -23,7 +23,21 @@ async function handleMessage(message: MessageType): Promise<any> {
   console.log('[AI-Translate bg] handleMessage dispatching type:', message.type)
   switch (message.type) {
     case 'TRANSLATE':
-      return await translateText(message.payload.text, message.payload.sourceLang, message.payload.targetLang)
+      return await translateText(message.payload.text, message.payload.sourceLang, message.payload.targetLang, message.payload.autoTranslate)
+
+    case 'GET_AUTO_TRANSLATE':
+      return await getAutoTranslate()
+
+    case 'SET_AUTO_TRANSLATE':
+      await setAutoTranslate(message.payload)
+      return { success: true }
+
+    case 'GET_AUTO_TRANSLATE_PAIR':
+      return await getAutoTranslatePair()
+
+    case 'SET_AUTO_TRANSLATE_PAIR':
+      await setAutoTranslatePair(message.payload)
+      return { success: true }
 
     case 'GET_CONFIG':
       return await getActiveApiConfig()

@@ -73,3 +73,43 @@ export async function setTargetLang(lang: string): Promise<void> {
     throw error
   }
 }
+
+export async function getAutoTranslate(): Promise<boolean> {
+  try {
+    const result = await chrome.storage.local.get(STORAGE_KEYS.AUTO_TRANSLATE)
+    return result[STORAGE_KEYS.AUTO_TRANSLATE] === true
+  } catch (error) {
+    console.error('Failed to get auto translate:', error)
+    return false
+  }
+}
+
+export async function setAutoTranslate(enabled: boolean): Promise<void> {
+  try {
+    await chrome.storage.local.set({ [STORAGE_KEYS.AUTO_TRANSLATE]: enabled })
+  } catch (error) {
+    console.error('Failed to set auto translate:', error)
+    throw error
+  }
+}
+
+export async function getAutoTranslatePair(): Promise<[string, string]> {
+  try {
+    const result = await chrome.storage.local.get(STORAGE_KEYS.AUTO_TRANSLATE_PAIR)
+    const pair = result[STORAGE_KEYS.AUTO_TRANSLATE_PAIR]
+    if (Array.isArray(pair) && pair.length === 2) return pair as [string, string]
+    return ['zh', 'en']
+  } catch (error) {
+    console.error('Failed to get auto translate pair:', error)
+    return ['zh', 'en']
+  }
+}
+
+export async function setAutoTranslatePair(pair: [string, string]): Promise<void> {
+  try {
+    await chrome.storage.local.set({ [STORAGE_KEYS.AUTO_TRANSLATE_PAIR]: pair })
+  } catch (error) {
+    console.error('Failed to set auto translate pair:', error)
+    throw error
+  }
+}

@@ -12,6 +12,7 @@ let inputPanelInstance: ReturnType<typeof createApp> | null = null
 let inputPanelContainer: HTMLElement | null = null
 
 function mountFloatingButton() {
+  if (window.location.protocol === 'chrome-extension:') return
   if (document.getElementById('ai-translation-floating')) return
   const container = document.createElement('div')
   container.id = 'ai-translation-floating'
@@ -23,6 +24,7 @@ function mountFloatingButton() {
 }
 
 function mountSelectionBubble() {
+  if (window.location.protocol === 'chrome-extension:') return
   if (document.getElementById('ai-translation-selection-bubble')) return
   const container = document.createElement('div')
   container.id = 'ai-translation-selection-bubble'
@@ -53,19 +55,38 @@ function openInputPanel() {
 // 选中文字翻译：立即显示 Sidebar loading，翻译完成后填充
 async function handleSelectionTranslate(text: string, targetLang = 'zh') {
   console.log('[AI-Translate content] handleSelectionTranslate, length:', text.length)
+    let autoTranslate = true;
+    chrome.storage?.local?.get(['target_lang', 'auto_translate'], (r) => {
+        console.log('[AI-Translate content] handleSelectionTranslate storage:', r)
+        if (typeof r?.target_lang === 'string'){
+            targetLang = r.target_lang
+        } else{
+            targetLang = 'zh'
+        }
+        if (r?.auto_translate === true) autoTranslate = true
+    })
   const state = reactive({
     originalText: text,
     translatedText: '',
     targetLang,
     loading: true,
-    error: ''
+    error: '',
+    autoTranslate
   })
   showSidebarReactive(state)
 
-  doTranslate(state, state.targetLang)
+  // Load auto-translate setting
+  chrome.storage?.local?.get('auto_translate', (r) => {
+    if (r?.auto_translate === true) {
+      state.autoTranslate = true
+      doTranslate(state, state.targetLang, true)
+    } else {
+      doTranslate(state, state.targetLang, false)
+    }
+  })
 }
 
-function showSidebarReactive(state: { originalText: string; translatedText: string; targetLang: string; loading: boolean; error: string }) {
+function showSidebarReactive(state: { originalText: string; translatedText: string; targetLang: string; loading: boolean; error: string; autoTranslate: boolean }) {
   if (sidebarInstance) {
     sidebarInstance.unmount()
     sidebarInstance = null
@@ -84,12 +105,16 @@ function showSidebarReactive(state: { originalText: string; translatedText: stri
         targetLang: state.targetLang,
         loading: state.loading,
         error: state.error,
+        autoTranslate: state.autoTranslate,
         'onUpdate:targetLang': (lang: string) => {
           state.targetLang = lang
-          // Re-translate with new language
-          doTranslate(state, lang)
-          // Save language preference
+          doTranslate(state, lang, state.autoTranslate)
           chrome.storage?.local?.set({ target_lang: lang })
+        },
+        'onUpdate:autoTranslate': (value: boolean) => {
+          state.autoTranslate = value
+          doTranslate(state, state.targetLang, value)
+          chrome.storage?.local?.set({ auto_translate: value })
         },
         onClose: () => {
           app.unmount()
@@ -103,7 +128,7 @@ function showSidebarReactive(state: { originalText: string; translatedText: stri
   app.mount(container)
 }
 
-async function doTranslate(state: { originalText: string; translatedText: string; targetLang: string; loading: boolean; error: string }, targetLang: string) {
+async function doTranslate(state: { originalText: string; translatedText: string; targetLang: string; loading: boolean; error: string }, targetLang: string, autoTranslate = false) {
   state.loading = true
   state.error = ''
   state.translatedText = ''
@@ -111,7 +136,7 @@ async function doTranslate(state: { originalText: string; translatedText: string
   try {
     const response = await chrome.runtime.sendMessage({
       type: 'TRANSLATE',
-      payload: { text: state.originalText, targetLang }
+      payload: { text: state.originalText, targetLang, autoTranslate }
     }) as { translatedText?: string; error?: string }
 
     if (!response) {

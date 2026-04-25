@@ -25,6 +25,9 @@ const y = ref(0)
 let selectionText = ''
 
 function handleSelectionChange() {
+  // 排除插件自己的页面（popup、options 等）
+  if (window.location.protocol === 'chrome-extension:') return
+
   const selection = window.getSelection()
   const text = selection?.toString().trim()
 

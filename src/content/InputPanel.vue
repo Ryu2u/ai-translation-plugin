@@ -11,7 +11,14 @@
           <button class="close-btn" @click="handleClose">×</button>
         </div>
         <div class="panel-body">
-          <div class="lang-row">
+          <div class="auto-row">
+            <label class="toggle-label">
+              <input type="checkbox" v-model="autoTranslate" class="toggle-input" />
+              <span class="toggle-text">自动翻译</span>
+            </label>
+            <span class="auto-hint" v-if="autoTranslate">根据输入语言自动识别翻译方向</span>
+          </div>
+          <div class="lang-row" v-if="!autoTranslate">
             <label>目标语言：</label>
             <select v-model="targetLang" :disabled="loading" class="lang-select">
               <option v-for="opt in langOptions" :key="opt.code" :value="opt.code">{{ opt.label }}</option>
@@ -68,6 +75,7 @@ const langOptions = [
 
 const inputText = ref('')
 const targetLang = ref('zh')
+const autoTranslate = ref(false)
 const loading = ref(false)
 const result = ref('')
 const error = ref('')
@@ -148,10 +156,10 @@ async function handleTranslate() {
   error.value = ''
   result.value = ''
   try {
-    console.log('[AI-Translate content] InputPanel sending TRANSLATE, length:', text.length, 'targetLang:', targetLang.value)
+    console.log('[AI-Translate content] InputPanel sending TRANSLATE, length:', text.length, 'targetLang:', targetLang.value, 'autoTranslate:', autoTranslate.value)
     const response = await chrome.runtime.sendMessage({
       type: 'TRANSLATE',
-      payload: { text, targetLang: targetLang.value }
+      payload: { text, targetLang: targetLang.value, autoTranslate: autoTranslate.value }
     }) as { translatedText?: string; error?: string }
     console.log('[AI-Translate content] InputPanel response:', response)
     if (!response) {
@@ -180,9 +188,9 @@ async function copyResult() {
 }
 
 onMounted(() => {
-  // 从 storage 加载上次选择的目标语言
-  chrome.storage?.local?.get('target_lang', (r) => {
+  chrome.storage?.local?.get(['target_lang', 'auto_translate'], (r) => {
     if (typeof r?.target_lang === 'string') targetLang.value = r.target_lang
+    if (r?.auto_translate === true) autoTranslate.value = true
   })
 })
 
@@ -258,6 +266,40 @@ onUnmounted(() => {
   margin-bottom: 10px;
   font-size: 13px;
   color: #9ca3af;
+}
+
+.auto-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #2d2d2d;
+}
+
+.toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.toggle-input {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: #4f46e5;
+}
+
+.toggle-text {
+  font-size: 14px;
+  color: #e5e7eb;
+  user-select: none;
+}
+
+.auto-hint {
+  font-size: 12px;
+  color: #6b7280;
 }
 .lang-select {
   flex: 1;

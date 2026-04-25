@@ -3,10 +3,14 @@
     <div class="sidebar">
       <div class="sidebar-header">
         <span>翻译结果</span>
-        <select v-model="currentLang" :disabled="loading" class="lang-select">
+        <label class="auto-toggle">
+          <input type="checkbox" v-model="autoTranslate" @change="onAutoTranslateChange" class="toggle-input" />
+          <span class="toggle-text">自动翻译</span>
+        </label>
+        <select v-model="currentLang" v-if="!autoTranslate" :disabled="loading" class="lang-select">
           <option v-for="opt in langOptions" :key="opt.code" :value="opt.code">{{ opt.label }}</option>
         </select>
-        <button class="close-btn" @click="handleClose">×</button>
+<!--        <button class="close-btn" @click="handleClose">×</button>-->
       </div>
       <div class="sidebar-content">
         <div class="section">
@@ -31,7 +35,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import {ref, watch} from 'vue'
 
 const props = defineProps<{
   originalText: string
@@ -39,11 +43,13 @@ const props = defineProps<{
   targetLang?: string
   loading?: boolean
   error?: string
+  autoTranslate?: boolean
 }>()
 
 const emit = defineEmits<{
   (e: 'close'): void
   (e: 'update:targetLang', lang: string): void
+  (e: 'update:autoTranslate', value: boolean): void
 }>()
 
 const langOptions = [
@@ -60,10 +66,17 @@ const langOptions = [
 ]
 
 const currentLang = ref(props.targetLang || 'zh')
+const autoTranslate = ref(props.autoTranslate || false)
 
 watch(currentLang, (newLang) => {
   emit('update:targetLang', newLang)
 })
+
+function onAutoTranslateChange() {
+  emit('update:autoTranslate', autoTranslate.value)
+  chrome.storage?.local?.set({ auto_translate: autoTranslate.value })
+}
+
 
 const copied = ref(false)
 
@@ -145,6 +158,27 @@ async function copyText() {
 .lang-select:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.auto-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  margin-right: 8px;
+}
+
+.toggle-input {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+  accent-color: #4f46e5;
+}
+
+.toggle-text {
+  font-size: 12px;
+  color: #9ca3af;
+  user-select: none;
 }
 
 .sidebar-content {

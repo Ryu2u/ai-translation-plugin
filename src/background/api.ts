@@ -1,5 +1,5 @@
 import type { TranslateResponse } from '../types'
-import { getActiveApiConfig, getTargetLang } from './storage'
+import { getActiveApiConfig, getTargetLang, getAutoTranslatePair } from './storage'
 
 const langNames: Record<string, string> = {
   zh: 'Chinese', en: 'English', ja: 'Japanese', ko: 'Korean',
@@ -7,12 +7,19 @@ const langNames: Record<string, string> = {
   ar: 'Arabic', pt: 'Portuguese'
 }
 
+/** 简单语言检测：统计中文字符比例 */
+function detectChineseRatio(text: string): number {
+  const chineseChars = text.match(/[\u4e00-\u9fff]/g) || []
+  return chineseChars.length / text.length
+}
+
 export async function translateText(
   text: string,
   _sourceLang?: string,
-  overrideTargetLang?: string
+  overrideTargetLang?: string,
+  autoTranslate?: boolean
 ): Promise<TranslateResponse> {
-  console.log('[AI-Translate api] translateText called, textLength:', text?.length, 'overrideLang:', overrideTargetLang)
+  console.log('[AI-Translate api] translateText called, textLength:', text?.length, 'overrideLang:', overrideTargetLang, 'autoTranslate:', autoTranslate)
   const config = await getActiveApiConfig()
   console.log('[AI-Translate api] active config:', config ? {
     hasApiKey: !!config.apiKey,
@@ -24,7 +31,15 @@ export async function translateText(
     throw new Error('请先在设置页面配置 API Key')
   }
 
-  const targetLang = overrideTargetLang || await getTargetLang()
+  let targetLang = overrideTargetLang || await getTargetLang()
+
+  if (autoTranslate) {
+    const pair = await getAutoTranslatePair()
+    const detectedLang = detectChineseRatio(text) > 0.3 ? pair[0] : pair[1]
+    targetLang = detectedLang === pair[0] ? pair[1] : pair[0]
+    console.log('[AI-Translate api] autoTranslate detected:', detectedLang, '-> target:', targetLang)
+  }
+
   const langDisplay = langNames[targetLang] || targetLang
   console.log('[AI-Translate api] targetLang:', targetLang, '->', langDisplay)
 
