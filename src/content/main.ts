@@ -203,7 +203,7 @@ chrome.runtime.onMessage.addListener((message: ContentMessage) => {
   }
 })
 
-window.addEventListener('unload', () => {
+window.addEventListener('pagehide', () => {
   floatingButton?.unmount()
   selectionBubble?.unmount()
   inputPanelInstance?.unmount()
