@@ -173,5 +173,20 @@ window.addEventListener('unload', () => {
   inputPanelInstance?.unmount()
 })
 
+function isFullscreen(): boolean {
+  if (document.fullscreenElement) return true
+  // F11 native fullscreen: window fills the entire screen (browser chrome hidden)
+  return window.innerHeight >= screen.height - 5
+}
+
+function handleFullscreenChange() {
+  const el = document.getElementById('ai-translation-floating')
+  if (!el) return
+  el.style.display = isFullscreen() ? 'none' : ''
+}
+
+document.addEventListener('fullscreenchange', handleFullscreenChange)
+window.addEventListener('resize', handleFullscreenChange)
+
 mountFloatingButton()
 mountSelectionBubble()
