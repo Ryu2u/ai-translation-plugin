@@ -1,15 +1,15 @@
 import { createApp, reactive, h } from 'vue'
 import FloatingButton from './FloatingButton.vue'
 import SelectionBubble from './SelectionBubble.vue'
-import Sidebar from './Sidebar.vue'
 import InputPanel from './InputPanel.vue'
+import InlineTranslation from './InlineTranslation.vue'
 import './styles/content.css'
 
 let floatingButton: ReturnType<typeof createApp> | null = null
 let selectionBubble: ReturnType<typeof createApp> | null = null
-let sidebarInstance: ReturnType<typeof createApp> | null = null
 let inputPanelInstance: ReturnType<typeof createApp> | null = null
 let inputPanelContainer: HTMLElement | null = null
+let inlineTranslationInstance: ReturnType<typeof createApp> | null = null
 
 function mountFloatingButton() {
   if (window.location.protocol === 'chrome-extension:') return
@@ -30,7 +30,8 @@ function mountSelectionBubble() {
   container.id = 'ai-translation-selection-bubble'
   document.body.appendChild(container)
   selectionBubble = createApp(SelectionBubble, {
-    onTranslate: (text: string) => handleSelectionTranslate(text)
+    onTranslate: (text: string, rect: { left: number; top: number; bottom: number; width: number } | null, insertionEl: Element | null) =>
+      handleSelectionTranslate(text, rect, insertionEl)
   })
   selectionBubble.mount(container)
 }
@@ -52,19 +53,25 @@ function openInputPanel() {
   inputPanelInstance.mount(inputPanelContainer)
 }
 
-// 选中文字翻译：立即显示 Sidebar loading，翻译完成后填充
-async function handleSelectionTranslate(text: string, targetLang = 'zh') {
+// 选中文字翻译：在源文字下方内联展示翻译结果
+async function handleSelectionTranslate(
+  text: string,
+  rect?: { left: number; top: number; bottom: number; width: number } | null,
+  insertionEl?: Element | null,
+  targetLang = 'zh'
+) {
   console.log('[AI-Translate content] handleSelectionTranslate, length:', text.length)
-    let autoTranslate = true;
-    chrome.storage?.local?.get(['target_lang', 'auto_translate'], (r) => {
-        console.log('[AI-Translate content] handleSelectionTranslate storage:', r)
-        if (typeof r?.target_lang === 'string'){
-            targetLang = r.target_lang
-        } else{
-            targetLang = 'zh'
-        }
-        if (r?.auto_translate === true) autoTranslate = true
-    })
+  let autoTranslate = true
+  chrome.storage?.local?.get(['target_lang', 'auto_translate'], (r) => {
+    console.log('[AI-Translate content] handleSelectionTranslate storage:', r)
+    if (typeof r?.target_lang === 'string') {
+      targetLang = r.target_lang
+    } else {
+      targetLang = 'zh'
+    }
+    if (r?.auto_translate === true) autoTranslate = true
+  })
+
   const state = reactive({
     originalText: text,
     translatedText: '',
@@ -73,7 +80,17 @@ async function handleSelectionTranslate(text: string, targetLang = 'zh') {
     error: '',
     autoTranslate
   })
-  showSidebarReactive(state)
+
+  if (insertionEl) {
+    // DOM 流内插入：直接在源元素下方
+    showInlineTranslation(state, insertionEl)
+  } else {
+    // 兜底：绝对定位在 body
+    const x = rect ? rect.left + window.scrollX : window.scrollX + window.innerWidth / 2 - 260
+    const y = rect ? rect.bottom + window.scrollY + 8 : window.scrollY + window.innerHeight / 3
+    const width = rect ? rect.width : 520
+    showInlineTranslation(state, null, x, y, width)
+  }
 
   // Load auto-translate setting
   chrome.storage?.local?.get('auto_translate', (r) => {
@@ -86,20 +103,32 @@ async function handleSelectionTranslate(text: string, targetLang = 'zh') {
   })
 }
 
-function showSidebarReactive(state: { originalText: string; translatedText: string; targetLang: string; loading: boolean; error: string; autoTranslate: boolean }) {
-  if (sidebarInstance) {
-    sidebarInstance.unmount()
-    sidebarInstance = null
-    document.getElementById('ai-translation-sidebar')?.remove()
+function showInlineTranslation(
+  state: { originalText: string; translatedText: string; targetLang: string; loading: boolean; error: string; autoTranslate: boolean },
+  insertionEl: Element | null,
+  x?: number,
+  y?: number,
+  width?: number
+) {
+  if (inlineTranslationInstance) {
+    inlineTranslationInstance.unmount()
+    inlineTranslationInstance = null
+    document.getElementById('ai-translation-inline')?.remove()
   }
 
   const container = document.createElement('div')
-  container.id = 'ai-translation-sidebar'
-  document.body.appendChild(container)
+  container.id = 'ai-translation-inline'
+
+  if (insertionEl && insertionEl.parentElement) {
+    container.style.display = 'block'
+    insertionEl.insertAdjacentElement('afterend', container)
+  } else {
+    document.body.appendChild(container)
+  }
 
   const app = createApp({
     render() {
-      return h(Sidebar as any, {
+      const props: Record<string, any> = {
         originalText: state.originalText,
         translatedText: state.translatedText,
         targetLang: state.targetLang,
@@ -118,13 +147,21 @@ function showSidebarReactive(state: { originalText: string; translatedText: stri
         },
         onClose: () => {
           app.unmount()
-          sidebarInstance = null
+          inlineTranslationInstance = null
           container.remove()
         }
-      })
+      }
+
+      if (x !== undefined && y !== undefined) {
+        props.x = x
+        props.y = y
+        props.width = width
+      }
+
+      return h(InlineTranslation as any, props)
     }
   })
-  sidebarInstance = app
+  inlineTranslationInstance = app
   app.mount(container)
 }
 
@@ -169,8 +206,8 @@ chrome.runtime.onMessage.addListener((message: ContentMessage) => {
 window.addEventListener('unload', () => {
   floatingButton?.unmount()
   selectionBubble?.unmount()
-  sidebarInstance?.unmount()
   inputPanelInstance?.unmount()
+  inlineTranslationInstance?.unmount()
 })
 
 function isFullscreen(): boolean {

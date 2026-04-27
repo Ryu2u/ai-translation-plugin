@@ -15,7 +15,7 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 
 const emit = defineEmits<{
-  (e: 'translate', text: string): void
+  (e: 'translate', text: string, rect: { left: number; top: number; bottom: number; width: number } | null, insertionEl: Element | null): void
 }>()
 
 const visible = ref(false)
@@ -23,6 +23,50 @@ const x = ref(0)
 const y = ref(0)
 
 let selectionText = ''
+let selectionRect: { left: number; top: number; bottom: number; width: number } | null = null
+
+const INLINE_DISPLAYS = new Set([
+  'inline', 'contents', 'none', 'ruby', 'ruby-base', 'ruby-text'
+])
+
+const DIV_DENIED_PARENTS = new Set([
+  'ul', 'ol', 'table', 'thead', 'tbody', 'tfoot', 'tr'
+])
+
+function findBlockInsertionPoint(): Element | null {
+  const selection = window.getSelection()
+  if (!selection || selection.rangeCount === 0) return null
+
+  const range = selection.getRangeAt(0)
+  let node: Node = range.commonAncestorContainer
+
+  if (node.nodeType === Node.TEXT_NODE) {
+    if (!node.parentElement) return null
+    node = node.parentElement
+  }
+
+  let el: Element | null = node as Element
+  while (el && el !== document.body && el !== document.documentElement) {
+    const display = window.getComputedStyle(el).display
+    if (!INLINE_DISPLAYS.has(display)) break
+    el = el.parentElement
+  }
+
+  if (!el || el === document.body || el === document.documentElement) {
+    return null
+  }
+
+  while (el && el !== document.body) {
+    const parent: Element | null = el.parentElement
+    if (!parent) return el
+    if (!DIV_DENIED_PARENTS.has(parent.tagName.toLowerCase())) {
+      return el
+    }
+    el = parent
+  }
+
+  return null
+}
 
 function handleSelectionChange() {
   // 排除插件自己的页面（popup、options 等）
@@ -36,6 +80,7 @@ function handleSelectionChange() {
     const range = selection?.getRangeAt(0)
     if (range) {
       const rect = range.getBoundingClientRect()
+      selectionRect = { left: rect.left, top: rect.top, bottom: rect.bottom, width: rect.width }
       x.value = rect.left + rect.width / 2
       y.value = rect.top - 10
       visible.value = true
@@ -48,7 +93,9 @@ function handleSelectionChange() {
 function handleClick() {
   console.log('[AI-Translate content] SelectionBubble clicked, text length:', selectionText.length)
   if (selectionText) {
-    emit('translate', selectionText)
+    const insertionEl = findBlockInsertionPoint()
+    console.log('[AI-Translate content] insertion element:', insertionEl?.tagName, insertionEl?.className)
+    emit('translate', selectionText, selectionRect, insertionEl)
     visible.value = false
     window.getSelection()?.removeAllRanges()
   }
