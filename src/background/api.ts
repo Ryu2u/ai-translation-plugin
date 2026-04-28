@@ -43,7 +43,7 @@ export async function translateText(
   const langDisplay = langNames[targetLang] || targetLang
   console.log('[AI-Translate api] targetLang:', targetLang, '->', langDisplay)
 
-  const systemPrompt = `You are a professional translator. Translate the following text to ${langDisplay}. Only respond with the translation, nothing else.`
+  const systemPrompt = `You are a professional translator. Translate the following text to ${langDisplay}. Preserve the original paragraph structure and line breaks. Only respond with the translation, nothing else.`
 
   const baseUrl = config.baseUrl.replace(/\/$/, '')
   const url = `${baseUrl}/chat/completions`

@@ -68,23 +68,65 @@ function findBlockInsertionPoint(): Element | null {
   return null
 }
 
+function extractTextWithBreaks(range: Range): string {
+  const walker = document.createTreeWalker(
+    range.commonAncestorContainer,
+    NodeFilter.SHOW_TEXT
+  )
+
+  let result = ''
+  let prevBlock: Element | null = null
+  let node = walker.firstChild() as Text | null
+
+  while (node) {
+    if (!range.intersectsNode(node)) {
+      node = walker.nextNode() as Text | null
+      continue
+    }
+
+    // Find the nearest block-level ancestor for this text node
+    let block: Element | null = node.parentElement
+    while (block && INLINE_DISPLAYS.has(window.getComputedStyle(block).display)) {
+      block = block.parentElement
+    }
+
+    // Insert \n when crossing into a different block
+    if (prevBlock && block !== prevBlock) {
+      result += '\n'
+    }
+    prevBlock = block
+
+    let t = node.textContent || ''
+    if (node === range.startContainer) t = t.slice(range.startOffset)
+    if (node === range.endContainer) t = t.slice(0, range.endOffset)
+    result += t
+
+    node = walker.nextNode() as Text | null
+  }
+
+  return result.trim()
+}
+
 function handleSelectionChange() {
   // 排除插件自己的页面（popup、options 等）
   if (window.location.protocol === 'chrome-extension:') return
 
   const selection = window.getSelection()
-  const text = selection?.toString().trim()
+  if (!selection || selection.rangeCount === 0) {
+    visible.value = false
+    return
+  }
+
+  const range = selection.getRangeAt(0)
+  const text = extractTextWithBreaks(range)
 
   if (text && text.length > 0) {
     selectionText = text
-    const range = selection?.getRangeAt(0)
-    if (range) {
-      const rect = range.getBoundingClientRect()
-      selectionRect = { left: rect.left, top: rect.top, bottom: rect.bottom, width: rect.width }
-      x.value = rect.left + rect.width / 2
-      y.value = rect.top - 10
-      visible.value = true
-    }
+    const rect = range.getBoundingClientRect()
+    selectionRect = { left: rect.left, top: rect.top, bottom: rect.bottom, width: rect.width }
+    x.value = rect.left + rect.width / 2
+    y.value = rect.top - 10
+    visible.value = true
   } else {
     visible.value = false
   }

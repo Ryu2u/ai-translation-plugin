@@ -1,5 +1,6 @@
 <template>
   <button
+    v-show="visible"
     class="floating-btn"
     :style="btnStyle"
     @mousedown="startDrag"
@@ -11,7 +12,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 
 const emit = defineEmits<{
   (e: 'translate'): void
@@ -20,10 +21,31 @@ const emit = defineEmits<{
 const DEFAULT_BOTTOM = 30
 const DEFAULT_RIGHT = 30
 
+const visible = ref(true)
 const bottom = ref(DEFAULT_BOTTOM)
 const right = ref(DEFAULT_RIGHT)
 const isDragging = ref(false)
 const wasDragged = ref(false)
+
+function isFullscreen(): boolean {
+  if (document.fullscreenElement) return true
+  return window.innerHeight >= screen.height - 5 && window.innerWidth >= screen.width - 5
+}
+
+function updateFullscreenState() {
+  visible.value = !isFullscreen()
+}
+
+onMounted(() => {
+  updateFullscreenState()
+  document.addEventListener('fullscreenchange', updateFullscreenState)
+  window.addEventListener('resize', updateFullscreenState)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('fullscreenchange', updateFullscreenState)
+  window.removeEventListener('resize', updateFullscreenState)
+})
 
 let dragStartX = 0, dragStartY = 0, origBottom = DEFAULT_BOTTOM, origRight = DEFAULT_RIGHT
 

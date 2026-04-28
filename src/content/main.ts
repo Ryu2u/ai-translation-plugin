@@ -121,6 +121,11 @@ function showInlineTranslation(
 
   if (insertionEl && insertionEl.parentElement) {
     container.style.display = 'block'
+    const elWidth = insertionEl.getBoundingClientRect().width
+    if (elWidth > 0) {
+      container.style.width = elWidth + 'px'
+      width = elWidth
+    }
     insertionEl.insertAdjacentElement('afterend', container)
   } else {
     document.body.appendChild(container)

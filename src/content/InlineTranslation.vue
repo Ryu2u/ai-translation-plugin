@@ -47,7 +47,7 @@ const containerStyle = computed(() => {
       position: 'absolute' as const,
       left: props.x + 'px',
       top: props.y + 'px',
-      minWidth: props.width ? Math.max(props.width, 260) + 'px' : '260px',
+      width: props.width ? props.width + 'px' : '260px',
     }
   }
   return {}
@@ -67,7 +67,6 @@ function handleClose() {
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
   z-index: 2147483646;
   animation: fadeIn 0.15s ease-out;
-  max-width: 520px;
   width: 100%;
   margin-top: 12px;
   margin-bottom: 12px;
@@ -107,6 +106,7 @@ function handleClose() {
   font-size: 14px;
   line-height: 1.6;
   word-break: break-word;
+  white-space: pre-wrap;
 }
 
 .loading-box {
