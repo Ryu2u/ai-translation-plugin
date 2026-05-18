@@ -53,8 +53,22 @@
 import { ref, onMounted } from 'vue'
 import type { ApiConfig } from '../../types'
 import { getApiConfigs, saveApiConfigs, setActiveApiId } from '../../background/storage'
+import { STORAGE_KEYS } from '../../types'
 
 const apiConfigs = ref<ApiConfig[]>([])
+
+async function getActiveApiId(): Promise<string | null> {
+  const result = await chrome.storage.local.get(STORAGE_KEYS.ACTIVE_API_ID)
+  return (result[STORAGE_KEYS.ACTIVE_API_ID] as string) || null
+}
+
+async function getApiConfigsWithActiveSync(): Promise<ApiConfig[]> {
+  const [configs, activeId] = await Promise.all([
+    getApiConfigs(),
+    getActiveApiId()
+  ])
+  return configs.map(c => ({ ...c, isActive: c.id === activeId }))
+}
 const showForm = ref(false)
 const editingId = ref<string | null>(null)
 
@@ -66,7 +80,7 @@ const formData = ref({
 })
 
 onMounted(async () => {
-  apiConfigs.value = await getApiConfigs()
+  apiConfigs.value = await getApiConfigsWithActiveSync()
 })
 
 function resetForm() {
@@ -136,23 +150,24 @@ async function deleteApi(id: string) {
 
   let configs = await getApiConfigs()
   configs = configs.filter(c => c.id !== id)
-  await saveApiConfigs(configs)
-  apiConfigs.value = configs
 
   // 如果删除的是当前激活的，激活第一个
   if (configs.length > 0 && !configs.some(c => c.isActive)) {
+    configs = configs.map((c, i) => ({ ...c, isActive: i === 0 }))
     await setActiveApiId(configs[0].id)
-    // Update local state to reflect the new active ID without re-fetching
-    apiConfigs.value = configs.map((c, i) => ({
-      ...c,
-      isActive: i === 0
-    }))
   }
+
+  await saveApiConfigs(configs)
+  apiConfigs.value = configs
 }
 
 async function activateApi(id: string) {
   await setActiveApiId(id)
-  apiConfigs.value = await getApiConfigs()
+  // 同步 isActive 字段到存储，确保 UI 和持久化状态一致
+  const configs = await getApiConfigs()
+  const updated = configs.map(c => ({ ...c, isActive: c.id === id }))
+  await saveApiConfigs(updated)
+  apiConfigs.value = updated
 }
 </script>
 

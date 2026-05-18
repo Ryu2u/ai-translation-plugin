@@ -171,7 +171,12 @@ async function handleTranslate() {
     }
   } catch (err: any) {
     console.error('[AI-Translate content] InputPanel sendMessage error:', err)
-    error.value = err?.message || String(err)
+    const msg = err?.message || String(err)
+    if (msg.includes('Extension context invalidated')) {
+      error.value = '扩展已更新，请刷新页面后重试'
+    } else {
+      error.value = msg
+    }
   } finally {
     loading.value = false
   }

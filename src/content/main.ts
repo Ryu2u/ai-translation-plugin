@@ -9,7 +9,12 @@ let floatingButton: ReturnType<typeof createApp> | null = null
 let selectionBubble: ReturnType<typeof createApp> | null = null
 let inputPanelInstance: ReturnType<typeof createApp> | null = null
 let inputPanelContainer: HTMLElement | null = null
-let inlineTranslationInstance: ReturnType<typeof createApp> | null = null
+
+interface TranslationInstance {
+  app: ReturnType<typeof createApp>
+  container: HTMLElement
+}
+const activeTranslations = new Map<string, TranslationInstance>()
 
 function mountFloatingButton() {
   if (window.location.protocol === 'chrome-extension:') return
@@ -34,6 +39,66 @@ function mountSelectionBubble() {
       handleSelectionTranslate(text, rect, insertionEl)
   })
   selectionBubble.mount(container)
+}
+
+// ── DOM 工具常量和函数（复用 SelectionBubble.vue 中的逻辑）──
+
+const INLINE_DISPLAYS = new Set([
+  'inline', 'contents', 'none', 'ruby', 'ruby-base', 'ruby-text'
+])
+
+const DIV_DENIED_PARENTS = new Set([
+  'ul', 'ol', 'table', 'thead', 'tbody', 'tfoot', 'tr'
+])
+
+const SKIP_TAGS = new Set([
+  'script', 'style', 'noscript', 'iframe', 'svg', 'br', 'hr', 'link', 'meta', 'code', 'pre'
+])
+
+const EXTENSION_ID_PREFIX = 'ai-translation-'
+const MAX_BLOCKS = 200
+
+function isExtensionElement(el: Element): boolean {
+  let current: Element | null = el
+  while (current) {
+    if (current.id && current.id.startsWith(EXTENSION_ID_PREFIX)) return true
+    current = current.parentElement
+  }
+  return false
+}
+
+function isElementVisible(el: Element): boolean {
+  let current: Element | null = el
+  while (current) {
+    const style = window.getComputedStyle(current)
+    if (style.display === 'none') return false
+    if (style.visibility === 'hidden') return false
+    current = current.parentElement
+  }
+  const rect = el.getBoundingClientRect()
+  return rect.width > 0 || rect.height > 0
+}
+
+function findNearestBlockAncestor(textNode: Node): Element | null {
+  let el: Element | null = textNode.parentElement
+  if (!el) return null
+  while (el && el !== document.body && el !== document.documentElement) {
+    if (!INLINE_DISPLAYS.has(window.getComputedStyle(el).display)) break
+    el = el.parentElement
+  }
+  if (!el || el === document.body || el === document.documentElement) return null
+  return el
+}
+
+function resolveInsertionElement(block: Element): Element | null {
+  let el: Element | null = block
+  while (el && el !== document.body && el !== document.documentElement) {
+    const parent: Element | null = el.parentElement
+    if (!parent || parent === document.body || parent === document.documentElement) return el
+    if (!DIV_DENIED_PARENTS.has(parent.tagName.toLowerCase())) return el
+    el = parent
+  }
+  return null
 }
 
 function openInputPanel() {
@@ -109,15 +174,11 @@ function showInlineTranslation(
   x?: number,
   y?: number,
   width?: number
-) {
-  if (inlineTranslationInstance) {
-    inlineTranslationInstance.unmount()
-    inlineTranslationInstance = null
-    document.getElementById('ai-translation-inline')?.remove()
-  }
+): string {
+  const instanceId = 'ai-translation-inline-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7)
 
   const container = document.createElement('div')
-  container.id = 'ai-translation-inline'
+  container.id = instanceId
 
   if (insertionEl && insertionEl.parentElement) {
     container.style.display = 'block'
@@ -143,7 +204,6 @@ function showInlineTranslation(
         'onUpdate:targetLang': (lang: string) => {
           state.targetLang = lang
           doTranslate(state, lang, state.autoTranslate)
-          chrome.storage?.local?.set({ target_lang: lang })
         },
         'onUpdate:autoTranslate': (value: boolean) => {
           state.autoTranslate = value
@@ -152,7 +212,7 @@ function showInlineTranslation(
         },
         onClose: () => {
           app.unmount()
-          inlineTranslationInstance = null
+          activeTranslations.delete(instanceId)
           container.remove()
         }
       }
@@ -166,8 +226,10 @@ function showInlineTranslation(
       return h(InlineTranslation as any, props)
     }
   })
-  inlineTranslationInstance = app
+
+  activeTranslations.set(instanceId, { app, container })
   app.mount(container)
+  return instanceId
 }
 
 async function doTranslate(state: { originalText: string; translatedText: string; targetLang: string; loading: boolean; error: string }, targetLang: string, autoTranslate = false) {
@@ -189,10 +251,166 @@ async function doTranslate(state: { originalText: string; translatedText: string
       state.translatedText = response.translatedText || ''
     }
   } catch (err: any) {
-    state.error = err?.message || String(err)
+    const msg = err?.message || String(err)
+    if (msg.includes('Extension context invalidated')) {
+      state.error = '扩展已更新，请刷新页面后重试'
+    } else {
+      state.error = msg
+    }
   } finally {
     state.loading = false
   }
+}
+
+// ── 整页翻译：逐元素内联翻译 ──
+
+interface TextBlock {
+  element: Element
+  text: string
+}
+
+function collectPageTextBlocks(): TextBlock[] {
+  const blockMap = new Map<Element, string[]>()
+
+  const walker = document.createTreeWalker(
+    document.body,
+    NodeFilter.SHOW_TEXT,
+    {
+      acceptNode: (node) => {
+        const textNode = node as Text
+        const parent = textNode.parentElement
+        if (!parent) return NodeFilter.FILTER_REJECT
+        if (isExtensionElement(parent)) return NodeFilter.FILTER_REJECT
+        if (!isElementVisible(parent)) return NodeFilter.FILTER_REJECT
+
+        let tagCheck: Element | null = parent
+        while (tagCheck) {
+          if (SKIP_TAGS.has(tagCheck.tagName.toLowerCase())) return NodeFilter.FILTER_REJECT
+          tagCheck = tagCheck.parentElement
+        }
+
+        const text = textNode.textContent || ''
+        if (!text.trim()) return NodeFilter.FILTER_SKIP
+
+        return NodeFilter.FILTER_ACCEPT
+      }
+    }
+  )
+
+  let textNode: Text | null
+  while ((textNode = walker.nextNode() as Text | null)) {
+    const block = findNearestBlockAncestor(textNode)
+    if (!block) continue
+
+    const insertionEl = resolveInsertionElement(block)
+    if (!insertionEl || insertionEl === document.body || insertionEl === document.documentElement) continue
+    if (isExtensionElement(insertionEl)) continue
+    if (!isElementVisible(insertionEl)) continue
+
+    if (!blockMap.has(insertionEl)) {
+      blockMap.set(insertionEl, [])
+    }
+    blockMap.get(insertionEl)!.push(textNode.textContent || '')
+  }
+
+  const results: TextBlock[] = []
+  for (const [element, fragments] of blockMap) {
+    const text = fragments.join('').replace(/\s+/g, ' ').trim()
+    if (text.length > 0) {
+      results.push({ element, text })
+    }
+  }
+
+  return results
+}
+
+function clearAllTranslations(): void {
+  for (const [, instance] of activeTranslations) {
+    instance.app.unmount()
+    instance.container.remove()
+  }
+  activeTranslations.clear()
+}
+
+interface TranslationTask {
+  state: ReturnType<typeof reactive> & {
+    originalText: string
+    translatedText: string
+    targetLang: string
+    loading: boolean
+    error: string
+    autoTranslate: boolean
+  }
+  instanceId: string
+}
+
+async function translateBatch(
+  tasks: TranslationTask[],
+  concurrency: number,
+  targetLang: string,
+  autoTranslate: boolean
+): Promise<void> {
+  let nextIndex = 0
+
+  async function worker(): Promise<void> {
+    while (nextIndex < tasks.length) {
+      const idx = nextIndex++
+      const task = tasks[idx]
+      task.state.targetLang = targetLang
+      task.state.autoTranslate = autoTranslate
+      await doTranslate(task.state, targetLang, autoTranslate)
+    }
+  }
+
+  const workers = Array.from(
+    { length: Math.min(concurrency, tasks.length) },
+    () => worker()
+  )
+  await Promise.all(workers)
+}
+
+async function handleTranslatePage(): Promise<void> {
+  console.log('[AI-Translate content] handleTranslatePage starting')
+
+  clearAllTranslations()
+
+  const blocks = collectPageTextBlocks()
+  console.log('[AI-Translate content] Collected', blocks.length, 'text blocks')
+
+  if (blocks.length === 0) {
+    console.log('[AI-Translate content] No translatable blocks found')
+    return
+  }
+
+  const limitedBlocks = blocks.slice(0, MAX_BLOCKS)
+  if (blocks.length > MAX_BLOCKS) {
+    console.warn('[AI-Translate content] Truncated from', blocks.length, 'to', MAX_BLOCKS, 'blocks')
+  }
+
+  let targetLang = 'zh'
+  let autoTranslate = false
+  chrome.storage?.local?.get(['target_lang', 'auto_translate'], (r) => {
+    if (typeof r?.target_lang === 'string') targetLang = r.target_lang
+    if (r?.auto_translate === true) autoTranslate = true
+  })
+
+  const tasks: TranslationTask[] = []
+  for (const block of limitedBlocks) {
+    const state = reactive({
+      originalText: block.text,
+      translatedText: '',
+      targetLang,
+      loading: false,
+      error: '',
+      autoTranslate
+    })
+
+    const instanceId = showInlineTranslation(state, block.element)
+    tasks.push({ state, instanceId })
+  }
+
+  await translateBatch(tasks, 3, targetLang, autoTranslate)
+  console.log('[AI-Translate content] handleTranslatePage completed')
 }
 
 interface ContentMessage {
@@ -202,7 +420,7 @@ interface ContentMessage {
 
 chrome.runtime.onMessage.addListener((message: ContentMessage) => {
   if (message.type === 'TRANSLATE_PAGE') {
-    openInputPanel()
+    handleTranslatePage()
   } else if (message.type === 'TRANSLATE_SELECTION' && message.text) {
     handleSelectionTranslate(message.text)
   }
@@ -212,7 +430,7 @@ window.addEventListener('pagehide', () => {
   floatingButton?.unmount()
   selectionBubble?.unmount()
   inputPanelInstance?.unmount()
-  inlineTranslationInstance?.unmount()
+  clearAllTranslations()
 })
 
 function isFullscreen(): boolean {

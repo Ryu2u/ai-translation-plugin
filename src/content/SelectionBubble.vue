@@ -69,8 +69,12 @@ function findBlockInsertionPoint(): Element | null {
 }
 
 function extractTextWithBreaks(range: Range): string {
+  // TreeWalker root must be an element node (text nodes have no children)
+  const root = range.commonAncestorContainer.nodeType === Node.TEXT_NODE
+    ? range.commonAncestorContainer.parentElement!
+    : range.commonAncestorContainer as Element
   const walker = document.createTreeWalker(
-    range.commonAncestorContainer,
+    root,
     NodeFilter.SHOW_TEXT
   )
 
@@ -118,6 +122,12 @@ function handleSelectionChange() {
   }
 
   const range = selection.getRangeAt(0)
+  // 折叠选区 = 光标定位，未实际选中文字
+  if (range.collapsed) {
+    visible.value = false
+    return
+  }
+
   const text = extractTextWithBreaks(range)
 
   if (text && text.length > 0) {
