@@ -126,15 +126,17 @@ async function handleSelectionTranslate(
   targetLang = 'zh'
 ) {
   console.log('[AI-Translate content] handleSelectionTranslate, length:', text.length)
-  let autoTranslate = true
+  let autoTranslate = false
   chrome.storage?.local?.get(['target_lang', 'auto_translate'], (r) => {
     console.log('[AI-Translate content] handleSelectionTranslate storage:', r)
     if (typeof r?.target_lang === 'string') {
       targetLang = r.target_lang
-    } else {
-      targetLang = 'zh'
+      state.targetLang = r.target_lang
     }
-    if (r?.auto_translate === true) autoTranslate = true
+    if (r?.auto_translate === true) {
+      autoTranslate = true
+      state.autoTranslate = true
+    }
   })
 
   const state = reactive({
@@ -163,6 +165,7 @@ async function handleSelectionTranslate(
       state.autoTranslate = true
       doTranslate(state, state.targetLang, true)
     } else {
+      state.autoTranslate = false
       doTranslate(state, state.targetLang, false)
     }
   })
@@ -203,7 +206,8 @@ function showInlineTranslation(
         autoTranslate: state.autoTranslate,
         'onUpdate:targetLang': (lang: string) => {
           state.targetLang = lang
-          doTranslate(state, lang, state.autoTranslate)
+          state.autoTranslate = false
+          doTranslate(state, lang, false)
         },
         'onUpdate:autoTranslate': (value: boolean) => {
           state.autoTranslate = value

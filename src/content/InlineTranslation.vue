@@ -11,14 +11,12 @@
         <span v-if="!autoTranslate" class="mode-badge manual">手动</span>
         <span v-else class="mode-badge auto">自动</span>
         <select
-          v-if="!autoTranslate"
           class="lang-select"
           :value="targetLang"
           @change="$emit('update:targetLang', ($event.target as HTMLSelectElement).value)"
         >
           <option v-for="opt in langOptions" :key="opt.code" :value="opt.code">{{ opt.label }}</option>
         </select>
-        <span v-else class="lang-label">{{ langLabel }}</span>
       </div>
       <button class="close-btn" type="button" @click="handleClose" aria-label="关闭">×</button>
     </div>
@@ -65,10 +63,6 @@ const langOptions = [
   { code: 'ar', label: 'العربية' },
   { code: 'pt', label: 'Português' }
 ]
-
-const langLabel = computed(() => {
-  return langOptions.find(o => o.code === props.targetLang)?.label || props.targetLang || '中文'
-})
 
 const visible = ref(true)
 
