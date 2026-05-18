@@ -42,7 +42,7 @@
           <div v-if="error" class="error-box">{{ error }}</div>
           <div v-if="result" class="result-section">
             <div class="section-label">译文</div>
-            <div class="result-box">{{ result }}</div>
+            <div class="result-box rendered-markdown" v-html="renderMarkdown(result)" />
             <button class="copy-btn" @click="copyResult">{{ copied ? '已复制' : '复制译文' }}</button>
           </div>
         </div>
@@ -54,6 +54,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { renderMarkdown } from './markdown'
 
 const emit = defineEmits<{
   (e: 'close'): void

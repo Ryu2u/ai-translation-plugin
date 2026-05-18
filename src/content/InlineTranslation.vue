@@ -26,13 +26,14 @@
         <span>翻译中...</span>
       </div>
       <div v-else-if="error" class="error-box">{{ error }}</div>
-      <div v-else class="text-box translated">{{ translatedText }}</div>
+      <div v-else class="text-box translated rendered-markdown" v-html="renderMarkdown(translatedText)" />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { renderMarkdown } from './markdown'
 
 const props = defineProps<{
   originalText: string

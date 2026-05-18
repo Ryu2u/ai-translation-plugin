@@ -1,6 +1,6 @@
 import type { MessageType } from '../types'
-import { translateText } from './api'
-import { getActiveApiConfig, setTargetLang, getAutoTranslate, setAutoTranslate, getAutoTranslatePair, setAutoTranslatePair } from './storage'
+import { translateText, summarizeText } from './api'
+import { getActiveApiConfig, setTargetLang, getAutoTranslate, setAutoTranslate, getAutoTranslatePair, setAutoTranslatePair, setSummaryLang } from './storage'
 
 // 消息处理
 chrome.runtime.onMessage.addListener(
@@ -46,6 +46,13 @@ async function handleMessage(message: MessageType): Promise<any> {
       await setTargetLang(message.payload)
       return { success: true }
 
+    case 'SUMMARIZE_PAGE':
+      return await summarizeText(message.payload.text, message.payload.targetLang)
+
+    case 'SET_SUMMARY_LANG':
+      await setSummaryLang(message.payload)
+      return { success: true }
+
     default:
       throw new Error(`Unknown message type`)
   }
@@ -64,6 +71,12 @@ chrome.runtime.onInstalled.addListener(() => {
     title: '翻译选中内容',
     contexts: ['selection']
   })
+
+  chrome.contextMenus.create({
+    id: 'summarize-page',
+    title: '总结当前页面',
+    contexts: ['page']
+  })
 })
 
 // 右键菜单点击处理
@@ -80,6 +93,9 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
         type: 'TRANSLATE_SELECTION',
         text: info.selectionText
       })
+    } else if (info.menuItemId === 'summarize-page') {
+      // 总结当前页面
+      chrome.tabs.sendMessage(tab.id, { type: 'SUMMARIZE_PAGE' })
     }
   } catch (error) {
     console.error('Failed to send message to tab:', error)

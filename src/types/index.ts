@@ -34,6 +34,8 @@ export type MessageType =
   | { type: 'SET_AUTO_TRANSLATE'; payload: boolean }
   | { type: 'GET_AUTO_TRANSLATE_PAIR'; payload: null }
   | { type: 'SET_AUTO_TRANSLATE_PAIR'; payload: [string, string] }
+  | { type: 'SUMMARIZE_PAGE'; payload: { text: string; targetLang: string } }
+  | { type: 'SET_SUMMARY_LANG'; payload: string }
 
 // 存储 Keys
 export const STORAGE_KEYS = {
@@ -42,5 +44,6 @@ export const STORAGE_KEYS = {
   TARGET_LANG: 'target_lang',
   UI_STYLE: 'ui_style',
   AUTO_TRANSLATE: 'auto_translate',
-  AUTO_TRANSLATE_PAIR: 'auto_translate_pair'
+  AUTO_TRANSLATE_PAIR: 'auto_translate_pair',
+  SUMMARY_LANG: 'summary_lang'
 } as const

@@ -3,12 +3,15 @@ import FloatingButton from './FloatingButton.vue'
 import SelectionBubble from './SelectionBubble.vue'
 import InputPanel from './InputPanel.vue'
 import InlineTranslation from './InlineTranslation.vue'
+import SummaryPanel from './SummaryPanel.vue'
 import './styles/content.css'
 
 let floatingButton: ReturnType<typeof createApp> | null = null
 let selectionBubble: ReturnType<typeof createApp> | null = null
 let inputPanelInstance: ReturnType<typeof createApp> | null = null
 let inputPanelContainer: HTMLElement | null = null
+let summaryPanelInstance: ReturnType<typeof createApp> | null = null
+let summaryPanelContainer: HTMLElement | null = null
 
 interface TranslationInstance {
   app: ReturnType<typeof createApp>
@@ -328,6 +331,28 @@ function collectPageTextBlocks(): TextBlock[] {
   return results
 }
 
+function collectPageMainContent(): string {
+  const MAIN_CONTENT_MAX_CHARS = 8000
+  const selectors = [
+    'article', 'main', '[role="main"]',
+    '.post-content', '.article-content', '.entry-content',
+    '#content', '#main-content', '.markdown-body'
+  ]
+
+  // Tier 1: Try semantic content containers
+  for (const selector of selectors) {
+    const el = document.querySelector(selector)
+    if (el && isElementVisible(el) && !isExtensionElement(el)) {
+      const text = (el.textContent || '').replace(/\s+/g, ' ').trim()
+      if (text.length >= 100) return text.slice(0, MAIN_CONTENT_MAX_CHARS)
+    }
+  }
+
+  // Tier 2: Fall back to TreeWalker block collection
+  const blocks = collectPageTextBlocks()
+  return blocks.map(b => b.text).join('\n\n').slice(0, MAIN_CONTENT_MAX_CHARS)
+}
+
 function clearAllTranslations(): void {
   for (const [, instance] of activeTranslations) {
     instance.app.unmount()
@@ -417,8 +442,45 @@ async function handleTranslatePage(): Promise<void> {
   console.log('[AI-Translate content] handleTranslatePage completed')
 }
 
+async function handleSummarizePage(): Promise<void> {
+  console.log('[AI-Translate content] handleSummarizePage starting')
+
+  // Close existing panel if already open
+  if (summaryPanelInstance) {
+    summaryPanelInstance.unmount()
+    summaryPanelContainer?.remove()
+    summaryPanelInstance = null
+    summaryPanelContainer = null
+  }
+
+  // Collect page content synchronously
+  const pageContent = collectPageMainContent()
+  console.log('[AI-Translate content] Collected page content, length:', pageContent.length)
+
+  if (!pageContent) {
+    console.warn('[AI-Translate content] No page content to summarize')
+    return
+  }
+
+  // Mount SummaryPanel with page content
+  summaryPanelContainer = document.createElement('div')
+  summaryPanelContainer.id = 'ai-translation-summary-panel'
+  document.body.appendChild(summaryPanelContainer)
+
+  summaryPanelInstance = createApp(SummaryPanel, {
+    pageContent,
+    onClose: () => {
+      summaryPanelInstance?.unmount()
+      summaryPanelInstance = null
+      summaryPanelContainer?.remove()
+      summaryPanelContainer = null
+    }
+  })
+  summaryPanelInstance.mount(summaryPanelContainer)
+}
+
 interface ContentMessage {
-  type: 'TRANSLATE_PAGE' | 'TRANSLATE_SELECTION'
+  type: 'TRANSLATE_PAGE' | 'TRANSLATE_SELECTION' | 'SUMMARIZE_PAGE'
   text?: string
 }
 
@@ -427,6 +489,8 @@ chrome.runtime.onMessage.addListener((message: ContentMessage) => {
     handleTranslatePage()
   } else if (message.type === 'TRANSLATE_SELECTION' && message.text) {
     handleSelectionTranslate(message.text)
+  } else if (message.type === 'SUMMARIZE_PAGE') {
+    handleSummarizePage()
   }
 })
 
@@ -434,6 +498,7 @@ window.addEventListener('pagehide', () => {
   floatingButton?.unmount()
   selectionBubble?.unmount()
   inputPanelInstance?.unmount()
+  summaryPanelInstance?.unmount()
   clearAllTranslations()
 })
 

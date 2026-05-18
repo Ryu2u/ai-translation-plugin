@@ -1,5 +1,5 @@
 import type { TranslateResponse } from '../types'
-import { getActiveApiConfig, getTargetLang, getAutoTranslatePair } from './storage'
+import { getActiveApiConfig, getTargetLang, getAutoTranslatePair, getSummaryLang } from './storage'
 
 const langNames: Record<string, string> = {
   zh: 'Chinese', en: 'English', ja: 'Japanese', ko: 'Korean',
@@ -66,7 +66,8 @@ export async function translateText(
           { role: 'system', content: systemPrompt },
           { role: 'user', content: text }
         ],
-        temperature: 0.3
+        temperature: 0.3,
+        thinking: { type: 'disabled' }
       }),
       signal: controller.signal
     })
@@ -100,4 +101,83 @@ export async function translateText(
   }
 
   return { translatedText }
+}
+
+export async function summarizeText(
+  text: string,
+  targetLang?: string
+): Promise<{ summary: string }> {
+  console.log('[AI-Translate api] summarizeText called, textLength:', text?.length, 'targetLang:', targetLang)
+  const config = await getActiveApiConfig()
+  console.log('[AI-Translate api] active config for summary:', config ? {
+    hasApiKey: !!config.apiKey,
+    baseUrl: config.baseUrl,
+    model: config.model
+  } : null)
+  if (!config) {
+    throw new Error('请先在设置页面配置 API Key')
+  }
+
+  const lang = targetLang || await getSummaryLang()
+  const langDisplay = langNames[lang] || lang
+  console.log('[AI-Translate api] summary lang:', lang, '->', langDisplay)
+
+  const systemPrompt = `You are a helpful assistant. Summarize the following webpage content in ${langDisplay}. Provide a clear, well-structured summary covering the main topics, key points, and important conclusions. Preserve proper names, technical terms, and specific data points in their original form.`
+
+  const baseUrl = config.baseUrl.replace(/\/$/, '')
+  const url = `${baseUrl}/chat/completions`
+  console.log('[AI-Translate api] fetching for summary:', url, 'model:', config.model)
+
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 30000)
+
+  let response: Response
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${config.apiKey}`
+      },
+      body: JSON.stringify({
+        model: config.model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: text }
+        ],
+        temperature: 0.5,
+        thinking: { type: 'disabled' }
+      }),
+      signal: controller.signal
+    })
+    console.log('[AI-Translate api] summary response status:', response.status, response.statusText)
+  } catch (err) {
+    console.error('[AI-Translate api] summary fetch threw:', err)
+    throw err
+  } finally {
+    clearTimeout(timeoutId)
+  }
+
+  if (!response.ok) {
+    const errorBody = await response.text()
+    console.error('[AI-Translate api] summary non-OK body:', errorBody)
+    throw new Error(`API 请求失败: ${response.status} - ${errorBody}`)
+  }
+
+  const data = await response.json()
+  console.log('[AI-Translate api] summary response JSON:', data)
+  let summaryText: string | undefined = data.choices?.[0]?.message?.content
+  if (summaryText) {
+    summaryText = summaryText
+      .replace(/<think>[\s\S]*?<\/think>/gi, '')
+      .replace(/<think>[\s\S]*$/i, '')
+      .trim()
+  }
+  console.log('[AI-Translate api] summary length:', summaryText?.length)
+
+  if (!summaryText) {
+    throw new Error('总结结果为空')
+  }
+
+  return { summary: summaryText }
 }

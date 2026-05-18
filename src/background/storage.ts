@@ -4,6 +4,8 @@ import { STORAGE_KEYS } from '../types'
 /** Default target language code (Chinese) */
 const DEFAULT_TARGET_LANG = 'zh'
 
+const DEFAULT_SUMMARY_LANG = 'zh'
+
 export async function getApiConfigs(): Promise<ApiConfig[]> {
   try {
     const result = await chrome.storage.local.get(STORAGE_KEYS.API_CONFIGS)
@@ -110,6 +112,28 @@ export async function setAutoTranslatePair(pair: [string, string]): Promise<void
     await chrome.storage.local.set({ [STORAGE_KEYS.AUTO_TRANSLATE_PAIR]: pair })
   } catch (error) {
     console.error('Failed to set auto translate pair:', error)
+    throw error
+  }
+}
+
+export async function getSummaryLang(): Promise<string> {
+  try {
+    const result = await chrome.storage.local.get(STORAGE_KEYS.SUMMARY_LANG)
+    return (result[STORAGE_KEYS.SUMMARY_LANG] as string) || DEFAULT_SUMMARY_LANG
+  } catch (error) {
+    console.error('Failed to get summary lang:', error)
+    return DEFAULT_SUMMARY_LANG
+  }
+}
+
+export async function setSummaryLang(lang: string): Promise<void> {
+  if (typeof lang !== 'string' || lang.trim() === '') {
+    throw new Error('lang must be a non-empty string')
+  }
+  try {
+    await chrome.storage.local.set({ [STORAGE_KEYS.SUMMARY_LANG]: lang })
+  } catch (error) {
+    console.error('Failed to set summary lang:', error)
     throw error
   }
 }
